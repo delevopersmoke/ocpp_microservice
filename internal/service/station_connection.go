@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/delevopersmoke/ocpp_microservice/internal/models"
 	"github.com/delevopersmoke/ocpp_microservice/internal/repository"
 	"github.com/gorilla/websocket"
@@ -16,6 +17,9 @@ type StationService struct {
 	conn       *websocket.Conn
 	Repository *repository.Repository
 	Station    *models.Station
+
+	responseWaiters   map[string]chan []interface{}
+	responseWaitersMu sync.Mutex
 }
 
 // Глобальная map для хранения StationService по stationId
@@ -47,7 +51,11 @@ func RemoveStationService(stationId int) {
 }
 
 func NewStationService(conn *websocket.Conn, repo *repository.Repository, stationId int) *StationService {
-	stationService := &StationService{conn: conn, Repository: repo}
+	stationService := &StationService{
+		conn:            conn,
+		Repository:      repo,
+		responseWaiters: make(map[string]chan []interface{}),
+	}
 	stationService.InitializeStation(stationId)
 	return stationService
 }
@@ -85,6 +93,20 @@ func (s *StationService) HandleStationConnection() {
 			continue
 		}
 		log.Printf("Тип сообщения: %v", msgType)
+
+		if msgType == 3 { // Ответ на запрос
+			uniqueId, _ := ocppMsg[1].(string)
+			s.responseWaitersMu.Lock()
+			ch, ok := s.responseWaiters[uniqueId]
+			if ok {
+				ch <- ocppMsg
+				close(ch)
+				delete(s.responseWaiters, uniqueId)
+			}
+			s.responseWaitersMu.Unlock()
+			continue
+		}
+
 		if msgType == 2 {
 			if len(ocppMsg) < 4 {
 				log.Println("CALL: недостаточно элементов в сообщении")
@@ -417,21 +439,44 @@ type RemoteStartTransactionResponse struct {
 	Status string `json:"status"`
 }
 
+func (s *StationService) SendRequest(action string, payload interface{}, timeout time.Duration) ([]interface{}, error) {
+	uniqueId := generateUniqueId()
+	msg := []interface{}{2, uniqueId, action, payload}
+	msgBytes, err := json.Marshal(msg)
+	if err != nil {
+		return nil, err
+	}
+	ch := make(chan []interface{}, 1)
+	s.responseWaitersMu.Lock()
+	s.responseWaiters[uniqueId] = ch
+	s.responseWaitersMu.Unlock()
+	if err := s.conn.WriteMessage(websocket.TextMessage, msgBytes); err != nil {
+		s.responseWaitersMu.Lock()
+		delete(s.responseWaiters, uniqueId)
+		s.responseWaitersMu.Unlock()
+		return nil, err
+	}
+	select {
+	case resp := <-ch:
+		return resp, nil
+	case <-time.After(timeout):
+		s.responseWaitersMu.Lock()
+		delete(s.responseWaiters, uniqueId)
+		s.responseWaitersMu.Unlock()
+		return nil, fmt.Errorf("таймаут ожидания ответа для uniqueId: %s", uniqueId)
+	}
+}
+
 func (s *StationService) sendRemoteStartTransaction(connectorId int, idTag string) error {
-	uniqueId := generateUniqueId() // Можно реализовать генерацию уникального ID
 	req := RemoteStartTransactionRequest{
 		ConnectorId: connectorId,
 		IdTag:       idTag,
 	}
-	msg := []interface{}{2, uniqueId, "RemoteStartTransaction", req}
-	msgBytes, err := json.Marshal(msg)
+	resp, err := s.SendRequest("RemoteStartTransaction", req, 10*time.Second)
 	if err != nil {
 		return err
 	}
-	if err := s.conn.WriteMessage(websocket.TextMessage, msgBytes); err != nil {
-		return err
-	}
-	log.Printf("RemoteStartTransaction отправлен: connectorId=%d, idTag=%s", connectorId, idTag)
+	log.Printf("RemoteStartTransaction ответ: %+v", resp)
 	return nil
 }
 
