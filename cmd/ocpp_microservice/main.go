@@ -1,69 +1,91 @@
 package main
 
 import (
-	"context"
+	"database/sql"
+	"github.com/delevopersmoke/ocpp_microservice/internal/config"
+	"github.com/delevopersmoke/ocpp_microservice/internal/handler"
+	"github.com/delevopersmoke/ocpp_microservice/internal/proto/control"
+	"github.com/delevopersmoke/ocpp_microservice/internal/repository"
+	"github.com/delevopersmoke/ocpp_microservice/internal/service"
+	_ "github.com/go-sql-driver/mysql"
+	grpc "google.golang.org/grpc"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
-
-	"encoding/json"
-	"github.com/delevopersmoke/ocpp_microservice/internal/handler"
-	commandpb "github.com/delevopersmoke/ocpp_microservice/internal/service"
-	grpc "google.golang.org/grpc"
+	"time"
 )
 
-func sendToStation(stationId, command, payload string) (bool, string) {
-	handler.ConnectionsMutex().Lock()
-	defer handler.ConnectionsMutex().Unlock()
-	for _, c := range handler.Connections() {
-		if c.StationId == stationId {
-			msg := map[string]interface{}{
-				"command": command,
-				"payload": payload,
-			}
-			msgBytes, _ := json.Marshal(msg)
-			if err := c.Conn.WriteMessage(1, msgBytes); err != nil {
-				return false, "Ошибка отправки команды: " + err.Error()
-			}
-			return true, "Команда отправлена"
-		}
+const configPath = "configs/ocppmicroservice"
+
+type Server struct {
+	httpServer *http.Server
+}
+
+func (s *Server) Run(port string, handler http.Handler) error {
+	s.httpServer = &http.Server{
+		Addr:           ":" + port,
+		Handler:        handler,
+		MaxHeaderBytes: 1 << 20, // 1 MB
+		ReadTimeout:    60 * time.Second,
+		WriteTimeout:   60 * time.Second,
 	}
-	return false, "Станция не найдена"
+
+	return s.httpServer.ListenAndServe()
 }
 
 func main() {
-	go func() {
-		http.HandleFunc("/ws", handler.OCPPWebSocketHandler)
-		log.Println("OCPP 1.6J WebSocket сервер запущен на :8080/ws")
-		if err := http.ListenAndServe(":8080", nil); err != nil {
-			log.Fatal("Ошибка запуска сервера:", err)
-		}
-	}()
 
-	grpcServer := grpc.NewServer()
-	cmdSrv := &service.CommandServer{SendToStationFunc: sendToStation}
-	commandpb.RegisterCommandServiceServer(grpcServer, cmdSrv)
-
-	lis, err := net.Listen("tcp", ":9090")
+	cfg, err := config.Init(configPath)
 	if err != nil {
-		log.Fatalf("Не удалось запустить gRPC сервер: %v", err)
+		cfg = &config.Config{}
+		cfg.GRPC.Port = 5004
+		cfg.DB.Password = "TgN77EI5k3Uy"
+		cfg.DB.Name = "app"
+		cfg.DB.User = "admin"
+		cfg.DB.Host = "127.0.0.1"
+		cfg.DB.Port = 3306
 	}
-	log.Println("gRPC CommandService сервер запущен на :9090")
 
-	// Грейсфулл-шатдаун
+	dsn := cfg.DB.User + ":" + cfg.DB.Password + "@tcp(" + cfg.DB.Host + ":" + strconv.Itoa(cfg.DB.Port) + ")/" + cfg.DB.Name
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		log.Fatalf("Ошибка подключения к MySQL: %v", err)
+	}
+	defer db.Close()
+
+	repo := repository.NewRepository(db)
+	grpcServer := grpc.NewServer()
+	controlService := service.NewCommandServiceServer(repo)
+
+	handlers := handler.NewHandler(repo)
+	// Регистрируем маршруты
+	handlers.InitRoutes()
+	srv := new(Server)
+	go srv.Run("5010", http.DefaultServeMux)
+
+	control.RegisterCommandServiceServer(grpcServer, controlService)
+
+	lis, err := net.Listen("tcp", ":"+strconv.Itoa(cfg.GRPC.Port))
+	if err != nil {
+		log.Fatalf("Ошибка запуска gRPC listener: %v", err)
+	}
+	log.Println("User microservice started on port", cfg.GRPC.Port)
+
+	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-quit
-		log.Println("Остановка gRPC сервера...")
+		log.Println("Получен сигнал завершения, останавливаем gRPC сервер...")
 		grpcServer.GracefulStop()
-		os.Exit(0)
+		log.Println("gRPC сервер остановлен корректно")
 	}()
 
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("Ошибка работы gRPC сервера: %v", err)
+		log.Fatalf("Ошибка запуска gRPC сервера: %v", err)
 	}
 }
