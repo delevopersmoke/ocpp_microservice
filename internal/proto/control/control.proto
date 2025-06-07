@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package command;
+
+option go_package = ".;user";
+
+service CommandService {
+  rpc Start (StartStationRequest) returns (StartStationResponse);
+  rpc Stop (StopStationRequest) returns (StopStationResponse);
+}
+
+message CommandResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message StartStationRequest {
+  string station_id = 1;
+}
+
+message StartStationResponse {
+  bool success = 1;
+}
+
+message StopStationRequest {
+  string station_id = 1;
+}
+
+message StopStationResponse {
+  bool success = 1;
+}
