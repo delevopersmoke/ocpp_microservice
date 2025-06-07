@@ -407,3 +407,44 @@ func (s *StationService) handleFirmwareStatusNotification(uniqueId string, req F
 		log.Println("Ошибка отправки FirmwareStatusNotification ответа:", err)
 	}
 }
+
+type RemoteStartTransactionRequest struct {
+	ConnectorId int    `json:"connectorId"`
+	IdTag       string `json:"idTag"`
+}
+
+type RemoteStartTransactionResponse struct {
+	Status string `json:"status"`
+}
+
+func (s *StationService) sendRemoteStartTransaction(connectorId int, idTag string) error {
+	uniqueId := generateUniqueId() // Можно реализовать генерацию уникального ID
+	req := RemoteStartTransactionRequest{
+		ConnectorId: connectorId,
+		IdTag:       idTag,
+	}
+	msg := []interface{}{2, uniqueId, "RemoteStartTransaction", req}
+	msgBytes, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	if err := s.conn.WriteMessage(websocket.TextMessage, msgBytes); err != nil {
+		return err
+	}
+	log.Printf("RemoteStartTransaction отправлен: connectorId=%d, idTag=%s", connectorId, idTag)
+	return nil
+}
+
+// Вспомогательная функция для генерации уникального ID
+func generateUniqueId() string {
+	return time.Now().Format("20060102150405") + "_" + randomString(6)
+}
+
+func randomString(n int) string {
+	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[time.Now().UnixNano()%int64(len(letters))]
+	}
+	return string(b)
+}
