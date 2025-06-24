@@ -1,12 +1,16 @@
 package service
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/delevopersmoke/ocpp_microservice/internal/models"
+	"github.com/delevopersmoke/ocpp_microservice/internal/proto/control"
 	"github.com/delevopersmoke/ocpp_microservice/internal/repository"
 	"github.com/gorilla/websocket"
 	"log"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -18,8 +22,9 @@ type StationService struct {
 	Repository *repository.Repository
 	Station    *models.Station
 
-	responseWaiters   map[string]chan []interface{}
-	responseWaitersMu sync.Mutex
+	mu        sync.Mutex
+	respChans map[string]chan []byte
+	respMu    sync.Mutex
 }
 
 // Глобальная map для хранения StationService по stationId
@@ -52,9 +57,9 @@ func RemoveStationService(stationId int) {
 
 func NewStationService(conn *websocket.Conn, repo *repository.Repository, stationId int) *StationService {
 	stationService := &StationService{
-		conn:            conn,
-		Repository:      repo,
-		responseWaiters: make(map[string]chan []interface{}),
+		conn:       conn,
+		Repository: repo,
+		respChans:  make(map[string]chan []byte),
 	}
 	stationService.InitializeStation(stationId)
 	return stationService
@@ -95,15 +100,26 @@ func (s *StationService) HandleStationConnection() {
 		log.Printf("Тип сообщения: %v", msgType)
 
 		if msgType == 3 { // Ответ на запрос
+			log.Println("Ответ на запрос")
 			uniqueId, _ := ocppMsg[1].(string)
-			s.responseWaitersMu.Lock()
-			ch, ok := s.responseWaiters[uniqueId]
+			result := ocppMsg[2]
+			s.respMu.Lock()
+			log.Println("Ответ на запрос заблочили")
+			ch, ok := s.respChans[uniqueId]
 			if ok {
-				ch <- ocppMsg
-				close(ch)
-				delete(s.responseWaiters, uniqueId)
+				// Оборачиваем результат в map[string]json.RawMessage для совместимости
+				log.Println("Ответ на запрос отправляем в канал")
+				respMap := map[string]json.RawMessage{"result": {}}
+				if b, err := json.Marshal(result); err == nil {
+					respMap["result"] = b
+				}
+				if b, err := json.Marshal(respMap); err == nil {
+					ch <- b
+				}
+			} else {
+				log.Printf("Нет канала для уникального ID %s", uniqueId)
 			}
-			s.responseWaitersMu.Unlock()
+			s.respMu.Unlock()
 			continue
 		}
 
@@ -201,6 +217,19 @@ type StatusNotificationResponse struct{}
 // handleStatusNotification вынесена из handler для переиспользования
 func (s *StationService) handleStatusNotification(uniqueId string, req StatusNotificationRequest) {
 	log.Printf("StatusNotification от станции %s: connectorId=%d, status=%s, errorCode=%s", req.ConnectorId, req.Status, req.ErrorCode)
+	connector, err := s.Repository.Connector.Get(s.Station.Id, req.ConnectorId)
+	if err != nil {
+		log.Printf("Ошибка получения коннектора с ID %d: %v", req.ConnectorId, err)
+	} else {
+		connector.State = req.Status
+		//connector.ErrorCode = req.ErrorCode
+		if err := s.Repository.Connector.Update(connector); err != nil {
+			log.Printf("Ошибка обновления статуса коннектора %d: %v", req.ConnectorId, err)
+		} else {
+			log.Printf("Статус коннектора %d обновлен на %s", req.ConnectorId, req.Status)
+		}
+	}
+
 	resp := []interface{}{3, uniqueId, StatusNotificationResponse{}}
 	respBytes, _ := json.Marshal(resp)
 	if err := s.conn.WriteMessage(websocket.TextMessage, respBytes); err != nil {
@@ -229,7 +258,6 @@ type BootNotificationResponse struct {
 func (s *StationService) handleBootNotification(uniqueId string, req BootNotificationRequest) {
 	log.Printf("BootNotification от станции: vendor=%s, model=%s, serial=%s, firmware=%s", req.ChargePointVendor, req.ChargePointModel, req.ChargePointSerialNumber, req.FirmwareVersion)
 
-	// Здесь можно сохранить информацию о станции в базе данных, если нужно
 	s.Station.ChargeBoxVendor = req.ChargePointVendor
 	s.Station.ChargeBoxModel = req.ChargePointModel
 	s.Station.ChargeBoxSerial = req.ChargePointSerialNumber
@@ -238,15 +266,13 @@ func (s *StationService) handleBootNotification(uniqueId string, req BootNotific
 		log.Printf("Ошибка обновления станции в базе данных: %v", err)
 	}
 
-	resp := []interface{}{3, uniqueId, BootNotificationResponse{
+	res := BootNotificationResponse{
 		CurrentTime: time.Now().UTC().Format(time.RFC3339),
 		Interval:    60,
 		Status:      "Accepted",
-	}}
-	respBytes, _ := json.Marshal(resp)
-	if err := s.conn.WriteMessage(websocket.TextMessage, respBytes); err != nil {
-		log.Println("Ошибка отправки BootNotification ответа:", err)
 	}
+
+	s.sendResponse(uniqueId, res)
 }
 
 type HeartbeatRequest struct{}
@@ -257,13 +283,10 @@ type HeartbeatResponse struct {
 
 func (s *StationService) handleHeartbeat(uniqueId string, req HeartbeatRequest) {
 	log.Printf("Heartbeat от станции: id=%d", s.Station.Id)
-	resp := []interface{}{3, uniqueId, HeartbeatResponse{
+	res := HeartbeatResponse{
 		CurrentTime: time.Now().UTC().Format(time.RFC3339),
-	}}
-	respBytes, _ := json.Marshal(resp)
-	if err := s.conn.WriteMessage(websocket.TextMessage, respBytes); err != nil {
-		log.Println("Ошибка отправки Heartbeat ответа:", err)
 	}
+	s.sendResponse(uniqueId, res)
 }
 
 type StartTransactionRequest struct {
@@ -283,16 +306,21 @@ type StartTransactionResponse struct {
 
 func (s *StationService) handleStartTransaction(uniqueId string, req StartTransactionRequest) {
 	log.Printf("StartTransaction: connectorId=%d, idTag=%s, timestamp=%s, meterStart=%d, reservationId=%d", req.ConnectorId, req.IdTag, req.Timestamp, req.MeterStart, req.ReservationId)
-	resp := []interface{}{3, uniqueId, StartTransactionResponse{
-		TransactionId: 1, // Здесь можно сгенерировать/получить реальный ID транзакции
-		IdTagInfo: struct {
-			Status string `json:"status"`
-		}{Status: "Accepted"},
-	}}
-	respBytes, _ := json.Marshal(resp)
-	if err := s.conn.WriteMessage(websocket.TextMessage, respBytes); err != nil {
-		log.Println("Ошибка отправки StartTransaction ответа:", err)
+
+	res := StartTransactionResponse{}
+
+	session, err := s.Repository.Session.GetCurrentSessionByIdTag(req.IdTag)
+	if err != nil || session == nil {
+		res.TransactionId = 0
+		res.IdTagInfo.Status = "Rejected"
+	} else {
+		session.WasStartTransaction = 1
+		res.TransactionId = session.Id
+		res.IdTagInfo.Status = "Accepted"
+		_ = s.Repository.UpdateCurrentSession(session)
 	}
+
+	s.sendResponse(uniqueId, res)
 }
 
 type StopTransactionRequest struct {
@@ -311,15 +339,24 @@ type StopTransactionResponse struct {
 
 func (s *StationService) handleStopTransaction(uniqueId string, req StopTransactionRequest) {
 	log.Printf("StopTransaction: transactionId=%d, idTag=%s, timestamp=%s, meterStop=%d, reason=%s", req.TransactionId, req.IdTag, req.Timestamp, req.MeterStop, req.Reason)
-	resp := []interface{}{3, uniqueId, StopTransactionResponse{
-		IdTagInfo: struct {
-			Status string `json:"status"`
-		}{Status: "Accepted"},
-	}}
-	respBytes, _ := json.Marshal(resp)
-	if err := s.conn.WriteMessage(websocket.TextMessage, respBytes); err != nil {
-		log.Println("Ошибка отправки StopTransaction ответа:", err)
+	session, err := s.Repository.Session.GetCurrentSessionByID(req.TransactionId)
+
+	res := StopTransactionResponse{}
+	if err != nil || session == nil {
+		res.IdTagInfo.Status = "Invalid"
+	} else {
+		session.End = req.Timestamp
+		session.ChargedEnergy = float32(req.MeterStop)
+
+		err = s.Repository.DeleteCurrentSession(session.Id)
+		err = s.Repository.CreateFinishedSession(session)
+		if err != nil {
+			fmt.Println("UpdateCurrentSession:", err)
+		}
+		res.IdTagInfo.Status = "Invalid"
 	}
+
+	s.sendResponse(uniqueId, res)
 }
 
 type MeterValuesRequest struct {
@@ -347,11 +384,51 @@ type MeterValuesResponse struct{}
 
 func (s *StationService) handleMeterValues(uniqueId string, req MeterValuesRequest) {
 	log.Printf("MeterValues: connectorId=%d, transactionId=%d, meterValue=%+v", req.ConnectorId, req.TransactionId, req.MeterValue)
-	resp := []interface{}{3, uniqueId, MeterValuesResponse{}}
-	respBytes, _ := json.Marshal(resp)
-	if err := s.conn.WriteMessage(websocket.TextMessage, respBytes); err != nil {
-		log.Println("Ошибка отправки MeterValues ответа:", err)
+
+	session, err := s.Repository.Session.GetCurrentSessionByID(req.TransactionId)
+	if err != nil {
+
+	} else {
+		for _, mv := range req.MeterValue {
+			for _, sv := range mv.SampledValue {
+				if sv.Measurand == "Voltage" {
+					if v, err := strconv.ParseFloat(sv.Value, 32); err == nil {
+						session.Voltage = float32(v)
+					}
+				} else if sv.Measurand == "Current.Import" {
+					if v, err := strconv.ParseFloat(sv.Value, 32); err == nil {
+						session.Current = float32(v)
+					}
+				} else if sv.Measurand == "Power.Active.Import" {
+					if v, err := strconv.ParseFloat(sv.Value, 32); err == nil {
+						session.Power = float32(v)
+					}
+				} else if sv.Measurand == "Energy.Active.Import.Register" {
+					if v, err := strconv.ParseFloat(sv.Value, 32); err == nil {
+						session.ChargedEnergy = float32(v)
+					}
+				} else if sv.Measurand == "SoC" {
+					session.SOC, _ = strconv.Atoi(sv.Value)
+				}
+			}
+		}
+
+		if session.WasFirstMeterValues == 0 {
+			session.SOCBegin = session.SOC
+		}
+		if session.Power > session.MaxPower {
+			session.MaxPower = session.Power
+		}
+
+		session.WasFirstMeterValues = 1
+		err = s.Repository.Session.UpdateCurrentSession(session)
+		if err != nil {
+			fmt.Println("UpdateCurrentSession:", err)
+		}
 	}
+
+	res := MeterValuesResponse{}
+	s.sendResponse(uniqueId, res)
 }
 
 type AuthorizeRequest struct {
@@ -439,48 +516,130 @@ type RemoteStartTransactionResponse struct {
 	Status string `json:"status"`
 }
 
-func (s *StationService) SendRequest(action string, payload interface{}, timeout time.Duration) ([]interface{}, error) {
-	uniqueId := generateUniqueId()
-	msg := []interface{}{2, uniqueId, action, payload}
-	msgBytes, err := json.Marshal(msg)
-	if err != nil {
-		return nil, err
-	}
-	ch := make(chan []interface{}, 1)
-	s.responseWaitersMu.Lock()
-	s.responseWaiters[uniqueId] = ch
-	s.responseWaitersMu.Unlock()
-	if err := s.conn.WriteMessage(websocket.TextMessage, msgBytes); err != nil {
-		s.responseWaitersMu.Lock()
-		delete(s.responseWaiters, uniqueId)
-		s.responseWaitersMu.Unlock()
-		return nil, err
-	}
-	select {
-	case resp := <-ch:
-		return resp, nil
-	case <-time.After(timeout):
-		s.responseWaitersMu.Lock()
-		delete(s.responseWaiters, uniqueId)
-		s.responseWaitersMu.Unlock()
-		return nil, fmt.Errorf("таймаут ожидания ответа для uniqueId: %s", uniqueId)
-	}
-}
-
-func (s *StationService) sendRemoteStartTransaction(connectorId int, idTag string) error {
-	req := RemoteStartTransactionRequest{
-		ConnectorId: connectorId,
-		IdTag:       idTag,
-	}
-	resp, err := s.SendRequest("RemoteStartTransaction", req, 10*time.Second)
+func (s *StationService) sendRequest(command string, req interface{}, respObj interface{}) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	//if !o.isConnected || o.connection == nil {
+	//	return fmt.Errorf("not connected to OCPP server")
+	//}
+	id := generateUniqueId()
+	msg, err := json.Marshal([]interface{}{
+		2,
+		id,
+		command,
+		req,
+	})
 	if err != nil {
 		return err
 	}
-	log.Printf("RemoteStartTransaction ответ: %+v", resp)
-	return nil
+	ch := make(chan []byte, 1)
+	s.respMu.Lock()
+	s.respChans[id] = ch
+	s.respMu.Unlock()
+	defer func() {
+		s.respMu.Lock()
+		delete(s.respChans, id)
+		s.respMu.Unlock()
+	}()
+	if err := s.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+		//	o.isConnected = false
+		//	_ = o.connection.Close()
+		return err
+	}
+
+	fmt.Println("write msg:", string(msg))
+	select {
+	case resp := <-ch:
+		var result map[string]json.RawMessage
+		if err := json.Unmarshal(resp, &result); err != nil {
+			return err
+		}
+		if r, ok := result["result"]; ok {
+			if err := json.Unmarshal(r, respObj); err != nil {
+				return err
+			}
+			return nil
+		}
+		return fmt.Errorf("no result in response")
+	case <-time.After(10 * time.Second):
+		return fmt.Errorf("timeout waiting for response")
+	}
 }
 
-// Вспомогательная функция для генерации уникального ID
+func (s *StationService) sendRemoteStartTransaction(sessionId int) int {
+	session, err := s.Repository.Session.GetCurrentSessionByID(sessionId)
+	if err != nil || session == nil {
+		fmt.Println("<UNK> <UNK> <UNK> <UNK>:", err)
+		return -1
+	}
+
+	session.Begin = time.Now().UTC().Format(time.RFC3339)
+	session.IdTag = generateIdTag()
+
+	err = s.Repository.Session.UpdateCurrentSession(session)
+	if err != nil {
+		fmt.Println("UpdateCurrentSession:", err)
+		return int(control.ErrorCode_errorDB)
+	}
+
+	req := RemoteStartTransactionRequest{
+		ConnectorId: session.ConnectorId,
+		IdTag:       session.IdTag,
+	}
+
+	res := &RemoteStartTransactionResponse{}
+	err = s.sendRequest("RemoteStartTransaction", req, res)
+
+	if err != nil {
+		fmt.Println("sendRemoteStartTransaction:", err)
+		return int(control.ErrorCode_sendCommandError)
+	}
+
+	if res.Status != "Accepted" {
+		session.WasStartAccepted = -1
+		err = s.Repository.Session.UpdateCurrentSession(session)
+		if err != nil {
+			fmt.Println("UpdateCurrentSession:", err)
+		}
+		return int(control.ErrorCode_commandWasNotAccepted)
+	}
+	session.WasStartAccepted = 1
+	err = s.Repository.Session.UpdateCurrentSession(session)
+	if err != nil {
+		fmt.Println("UpdateCurrentSession:", err)
+	}
+
+	log.Printf("RemoteStartTransaction ответ: %+v", res)
+	return 0
+}
+
+type RemoteStopTransactionRequest struct {
+	TransactionId int `json:"transactionId"`
+}
+
+type RemoteStopTransactionResponse struct {
+	Status string `json:"status"`
+}
+
+func (s *StationService) sendRemoteStopTransaction(transactionId int) int {
+	req := RemoteStopTransactionRequest{
+		TransactionId: transactionId,
+	}
+
+	res := &RemoteStopTransactionResponse{}
+	err := s.sendRequest("RemoteStopTransaction", req, res)
+	if err != nil {
+		return int(control.ErrorCode_sendCommandError)
+	}
+
+	if res.Status != "Accepted" {
+		return int(control.ErrorCode_commandWasNotAccepted)
+	}
+
+	log.Printf("RemoteStopTransaction ответ: %+v", res)
+	return 0
+}
+
 func generateUniqueId() string {
 	return time.Now().Format("20060102150405") + "_" + randomString(6)
 }
@@ -492,4 +651,19 @@ func randomString(n int) string {
 		b[i] = letters[time.Now().UnixNano()%int64(len(letters))]
 	}
 	return string(b)
+}
+
+func generateIdTag() string {
+	b := make([]byte, 5) // 5 байт = 10 hex символов
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+// Общая функция отправки ответа
+func (s *StationService) sendResponse(uniqueId string, payload interface{}) {
+	resp := []interface{}{3, uniqueId, payload}
+	respBytes, _ := json.Marshal(resp)
+	if err := s.conn.WriteMessage(websocket.TextMessage, respBytes); err != nil {
+		log.Printf("Ошибка отправки ответа: %v", err)
+	}
 }

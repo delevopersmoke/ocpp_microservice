@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        v5.29.3
-// source: internal/proto/control/control.proto
+// source: proto/control/control.proto
 
 package control
 
@@ -21,6 +21,113 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type ErrorCode int32
+
+const (
+	ErrorCode_errorUnknown          ErrorCode = 0
+	ErrorCode_errorDB               ErrorCode = 1
+	ErrorCode_stationNotFound       ErrorCode = 2
+	ErrorCode_sendCommandError      ErrorCode = 3
+	ErrorCode_commandWasNotAccepted ErrorCode = 4
+)
+
+// Enum value maps for ErrorCode.
+var (
+	ErrorCode_name = map[int32]string{
+		0: "errorUnknown",
+		1: "errorDB",
+		2: "stationNotFound",
+		3: "sendCommandError",
+		4: "commandWasNotAccepted",
+	}
+	ErrorCode_value = map[string]int32{
+		"errorUnknown":          0,
+		"errorDB":               1,
+		"stationNotFound":       2,
+		"sendCommandError":      3,
+		"commandWasNotAccepted": 4,
+	}
+)
+
+func (x ErrorCode) Enum() *ErrorCode {
+	p := new(ErrorCode)
+	*p = x
+	return p
+}
+
+func (x ErrorCode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ErrorCode) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_control_control_proto_enumTypes[0].Descriptor()
+}
+
+func (ErrorCode) Type() protoreflect.EnumType {
+	return &file_proto_control_control_proto_enumTypes[0]
+}
+
+func (x ErrorCode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ErrorCode.Descriptor instead.
+func (ErrorCode) EnumDescriptor() ([]byte, []int) {
+	return file_proto_control_control_proto_rawDescGZIP(), []int{0}
+}
+
+type CustomErrorDetail struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          int64                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CustomErrorDetail) Reset() {
+	*x = CustomErrorDetail{}
+	mi := &file_proto_control_control_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CustomErrorDetail) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CustomErrorDetail) ProtoMessage() {}
+
+func (x *CustomErrorDetail) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_control_control_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CustomErrorDetail.ProtoReflect.Descriptor instead.
+func (*CustomErrorDetail) Descriptor() ([]byte, []int) {
+	return file_proto_control_control_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *CustomErrorDetail) GetCode() int64 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *CustomErrorDetail) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 type CommandResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
@@ -31,7 +138,7 @@ type CommandResponse struct {
 
 func (x *CommandResponse) Reset() {
 	*x = CommandResponse{}
-	mi := &file_internal_proto_control_control_proto_msgTypes[0]
+	mi := &file_proto_control_control_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +150,7 @@ func (x *CommandResponse) String() string {
 func (*CommandResponse) ProtoMessage() {}
 
 func (x *CommandResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_control_control_proto_msgTypes[0]
+	mi := &file_proto_control_control_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +163,7 @@ func (x *CommandResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandResponse.ProtoReflect.Descriptor instead.
 func (*CommandResponse) Descriptor() ([]byte, []int) {
-	return file_internal_proto_control_control_proto_rawDescGZIP(), []int{0}
+	return file_proto_control_control_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *CommandResponse) GetSuccess() bool {
@@ -75,14 +182,16 @@ func (x *CommandResponse) GetMessage() string {
 
 type StartStationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	StationId     string                 `protobuf:"bytes,1,opt,name=station_id,json=stationId,proto3" json:"station_id,omitempty"`
+	StationId     int64                  `protobuf:"varint,1,opt,name=station_id,json=stationId,proto3" json:"station_id,omitempty"`
+	ConnectorId   int64                  `protobuf:"varint,2,opt,name=connector_id,json=connectorId,proto3" json:"connector_id,omitempty"`
+	SessionId     int64                  `protobuf:"varint,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StartStationRequest) Reset() {
 	*x = StartStationRequest{}
-	mi := &file_internal_proto_control_control_proto_msgTypes[1]
+	mi := &file_proto_control_control_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -94,7 +203,7 @@ func (x *StartStationRequest) String() string {
 func (*StartStationRequest) ProtoMessage() {}
 
 func (x *StartStationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_control_control_proto_msgTypes[1]
+	mi := &file_proto_control_control_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -107,14 +216,28 @@ func (x *StartStationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartStationRequest.ProtoReflect.Descriptor instead.
 func (*StartStationRequest) Descriptor() ([]byte, []int) {
-	return file_internal_proto_control_control_proto_rawDescGZIP(), []int{1}
+	return file_proto_control_control_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *StartStationRequest) GetStationId() string {
+func (x *StartStationRequest) GetStationId() int64 {
 	if x != nil {
 		return x.StationId
 	}
-	return ""
+	return 0
+}
+
+func (x *StartStationRequest) GetConnectorId() int64 {
+	if x != nil {
+		return x.ConnectorId
+	}
+	return 0
+}
+
+func (x *StartStationRequest) GetSessionId() int64 {
+	if x != nil {
+		return x.SessionId
+	}
+	return 0
 }
 
 type StartStationResponse struct {
@@ -126,7 +249,7 @@ type StartStationResponse struct {
 
 func (x *StartStationResponse) Reset() {
 	*x = StartStationResponse{}
-	mi := &file_internal_proto_control_control_proto_msgTypes[2]
+	mi := &file_proto_control_control_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -138,7 +261,7 @@ func (x *StartStationResponse) String() string {
 func (*StartStationResponse) ProtoMessage() {}
 
 func (x *StartStationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_control_control_proto_msgTypes[2]
+	mi := &file_proto_control_control_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -151,7 +274,7 @@ func (x *StartStationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartStationResponse.ProtoReflect.Descriptor instead.
 func (*StartStationResponse) Descriptor() ([]byte, []int) {
-	return file_internal_proto_control_control_proto_rawDescGZIP(), []int{2}
+	return file_proto_control_control_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *StartStationResponse) GetSuccess() bool {
@@ -163,14 +286,15 @@ func (x *StartStationResponse) GetSuccess() bool {
 
 type StopStationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	StationId     string                 `protobuf:"bytes,1,opt,name=station_id,json=stationId,proto3" json:"station_id,omitempty"`
+	StationId     int64                  `protobuf:"varint,1,opt,name=station_id,json=stationId,proto3" json:"station_id,omitempty"`
+	SessionId     int64                  `protobuf:"varint,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StopStationRequest) Reset() {
 	*x = StopStationRequest{}
-	mi := &file_internal_proto_control_control_proto_msgTypes[3]
+	mi := &file_proto_control_control_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -182,7 +306,7 @@ func (x *StopStationRequest) String() string {
 func (*StopStationRequest) ProtoMessage() {}
 
 func (x *StopStationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_control_control_proto_msgTypes[3]
+	mi := &file_proto_control_control_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -195,14 +319,21 @@ func (x *StopStationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopStationRequest.ProtoReflect.Descriptor instead.
 func (*StopStationRequest) Descriptor() ([]byte, []int) {
-	return file_internal_proto_control_control_proto_rawDescGZIP(), []int{3}
+	return file_proto_control_control_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *StopStationRequest) GetStationId() string {
+func (x *StopStationRequest) GetStationId() int64 {
 	if x != nil {
 		return x.StationId
 	}
-	return ""
+	return 0
+}
+
+func (x *StopStationRequest) GetSessionId() int64 {
+	if x != nil {
+		return x.SessionId
+	}
+	return 0
 }
 
 type StopStationResponse struct {
@@ -214,7 +345,7 @@ type StopStationResponse struct {
 
 func (x *StopStationResponse) Reset() {
 	*x = StopStationResponse{}
-	mi := &file_internal_proto_control_control_proto_msgTypes[4]
+	mi := &file_proto_control_control_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -226,7 +357,7 @@ func (x *StopStationResponse) String() string {
 func (*StopStationResponse) ProtoMessage() {}
 
 func (x *StopStationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_control_control_proto_msgTypes[4]
+	mi := &file_proto_control_control_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -239,7 +370,7 @@ func (x *StopStationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopStationResponse.ProtoReflect.Descriptor instead.
 func (*StopStationResponse) Descriptor() ([]byte, []int) {
-	return file_internal_proto_control_control_proto_rawDescGZIP(), []int{4}
+	return file_proto_control_control_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *StopStationResponse) GetSuccess() bool {
@@ -249,53 +380,70 @@ func (x *StopStationResponse) GetSuccess() bool {
 	return false
 }
 
-var File_internal_proto_control_control_proto protoreflect.FileDescriptor
+var File_proto_control_control_proto protoreflect.FileDescriptor
 
-const file_internal_proto_control_control_proto_rawDesc = "" +
+const file_proto_control_control_proto_rawDesc = "" +
 	"\n" +
-	"$internal/proto/control/control.proto\x12\acommand\"E\n" +
+	"\x1bproto/control/control.proto\x12\acommand\"=\n" +
+	"\x11CustomErrorDetail\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x03R\x04code\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"E\n" +
 	"\x0fCommandResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"4\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"v\n" +
 	"\x13StartStationRequest\x12\x1d\n" +
 	"\n" +
-	"station_id\x18\x01 \x01(\tR\tstationId\"0\n" +
+	"station_id\x18\x01 \x01(\x03R\tstationId\x12!\n" +
+	"\fconnector_id\x18\x02 \x01(\x03R\vconnectorId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x03 \x01(\x03R\tsessionId\"0\n" +
 	"\x14StartStationResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\"3\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"R\n" +
 	"\x12StopStationRequest\x12\x1d\n" +
 	"\n" +
-	"station_id\x18\x01 \x01(\tR\tstationId\"/\n" +
+	"station_id\x18\x01 \x01(\x03R\tstationId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\x03R\tsessionId\"/\n" +
 	"\x13StopStationResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess2\x99\x01\n" +
-	"\x0eCommandService\x12D\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess*p\n" +
+	"\tErrorCode\x12\x10\n" +
+	"\ferrorUnknown\x10\x00\x12\v\n" +
+	"\aerrorDB\x10\x01\x12\x13\n" +
+	"\x0fstationNotFound\x10\x02\x12\x14\n" +
+	"\x10sendCommandError\x10\x03\x12\x19\n" +
+	"\x15commandWasNotAccepted\x10\x042\x99\x01\n" +
+	"\x0eControlService\x12D\n" +
 	"\x05Start\x12\x1c.command.StartStationRequest\x1a\x1d.command.StartStationResponse\x12A\n" +
-	"\x04Stop\x12\x1b.command.StopStationRequest\x1a\x1c.command.StopStationResponseB\bZ\x06.;userb\x06proto3"
+	"\x04Stop\x12\x1b.command.StopStationRequest\x1a\x1c.command.StopStationResponseB\vZ\t.;controlb\x06proto3"
 
 var (
-	file_internal_proto_control_control_proto_rawDescOnce sync.Once
-	file_internal_proto_control_control_proto_rawDescData []byte
+	file_proto_control_control_proto_rawDescOnce sync.Once
+	file_proto_control_control_proto_rawDescData []byte
 )
 
-func file_internal_proto_control_control_proto_rawDescGZIP() []byte {
-	file_internal_proto_control_control_proto_rawDescOnce.Do(func() {
-		file_internal_proto_control_control_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_proto_control_control_proto_rawDesc), len(file_internal_proto_control_control_proto_rawDesc)))
+func file_proto_control_control_proto_rawDescGZIP() []byte {
+	file_proto_control_control_proto_rawDescOnce.Do(func() {
+		file_proto_control_control_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_control_control_proto_rawDesc), len(file_proto_control_control_proto_rawDesc)))
 	})
-	return file_internal_proto_control_control_proto_rawDescData
+	return file_proto_control_control_proto_rawDescData
 }
 
-var file_internal_proto_control_control_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
-var file_internal_proto_control_control_proto_goTypes = []any{
-	(*CommandResponse)(nil),      // 0: command.CommandResponse
-	(*StartStationRequest)(nil),  // 1: command.StartStationRequest
-	(*StartStationResponse)(nil), // 2: command.StartStationResponse
-	(*StopStationRequest)(nil),   // 3: command.StopStationRequest
-	(*StopStationResponse)(nil),  // 4: command.StopStationResponse
+var file_proto_control_control_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_proto_control_control_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_proto_control_control_proto_goTypes = []any{
+	(ErrorCode)(0),               // 0: command.ErrorCode
+	(*CustomErrorDetail)(nil),    // 1: command.CustomErrorDetail
+	(*CommandResponse)(nil),      // 2: command.CommandResponse
+	(*StartStationRequest)(nil),  // 3: command.StartStationRequest
+	(*StartStationResponse)(nil), // 4: command.StartStationResponse
+	(*StopStationRequest)(nil),   // 5: command.StopStationRequest
+	(*StopStationResponse)(nil),  // 6: command.StopStationResponse
 }
-var file_internal_proto_control_control_proto_depIdxs = []int32{
-	1, // 0: command.CommandService.Start:input_type -> command.StartStationRequest
-	3, // 1: command.CommandService.Stop:input_type -> command.StopStationRequest
-	2, // 2: command.CommandService.Start:output_type -> command.StartStationResponse
-	4, // 3: command.CommandService.Stop:output_type -> command.StopStationResponse
+var file_proto_control_control_proto_depIdxs = []int32{
+	3, // 0: command.ControlService.Start:input_type -> command.StartStationRequest
+	5, // 1: command.ControlService.Stop:input_type -> command.StopStationRequest
+	4, // 2: command.ControlService.Start:output_type -> command.StartStationResponse
+	6, // 3: command.ControlService.Stop:output_type -> command.StopStationResponse
 	2, // [2:4] is the sub-list for method output_type
 	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
@@ -303,26 +451,27 @@ var file_internal_proto_control_control_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_internal_proto_control_control_proto_init() }
-func file_internal_proto_control_control_proto_init() {
-	if File_internal_proto_control_control_proto != nil {
+func init() { file_proto_control_control_proto_init() }
+func file_proto_control_control_proto_init() {
+	if File_proto_control_control_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_proto_control_control_proto_rawDesc), len(file_internal_proto_control_control_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   5,
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_control_control_proto_rawDesc), len(file_proto_control_control_proto_rawDesc)),
+			NumEnums:      1,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_internal_proto_control_control_proto_goTypes,
-		DependencyIndexes: file_internal_proto_control_control_proto_depIdxs,
-		MessageInfos:      file_internal_proto_control_control_proto_msgTypes,
+		GoTypes:           file_proto_control_control_proto_goTypes,
+		DependencyIndexes: file_proto_control_control_proto_depIdxs,
+		EnumInfos:         file_proto_control_control_proto_enumTypes,
+		MessageInfos:      file_proto_control_control_proto_msgTypes,
 	}.Build()
-	File_internal_proto_control_control_proto = out.File
-	file_internal_proto_control_control_proto_goTypes = nil
-	file_internal_proto_control_control_proto_depIdxs = nil
+	File_proto_control_control_proto = out.File
+	file_proto_control_control_proto_goTypes = nil
+	file_proto_control_control_proto_depIdxs = nil
 }

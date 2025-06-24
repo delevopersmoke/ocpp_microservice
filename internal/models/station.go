@@ -7,5 +7,5 @@ type Station struct {
 	ChargeBoxVendor   string `json:"charge_box_vendor"`
 	ChargeBoxModel    string `json:"charge_box_model"`
 	ChargeBoxFirmware string `json:"charge_box_firmware"`
-	State             int    `json:"state"`
+	State             string `json:"state"`
 }

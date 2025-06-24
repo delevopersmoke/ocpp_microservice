@@ -13,22 +13,9 @@ func NewConnectorRepository(db *sql.DB) *ConnectorRepository {
 	return &ConnectorRepository{db: db}
 }
 
-func (r *ConnectorRepository) Create(connector *models.Connector) error {
-	query := "INSERT INTO connectors (station_id, state) VALUES (?, ?)"
-	result, err := r.db.Exec(query, connector.StationId, connector.State)
-	if err != nil {
-		return err
-	}
-	id, err := result.LastInsertId()
-	if err == nil {
-		connector.Id = int(id)
-	}
-	return err
-}
-
-func (r *ConnectorRepository) GetByID(id int) (*models.Connector, error) {
-	query := "SELECT id, station_id, state FROM connectors WHERE id = ?"
-	row := r.db.QueryRow(query, id)
+func (r *ConnectorRepository) Get(stationId int, id int) (*models.Connector, error) {
+	query := "SELECT ocpp_id, station_id, state FROM connectors WHERE station_id = ? AND ocpp_id = ?"
+	row := r.db.QueryRow(query, stationId, id)
 	var c models.Connector
 	if err := row.Scan(&c.Id, &c.StationId, &c.State); err != nil {
 		if err == sql.ErrNoRows {
@@ -58,13 +45,7 @@ func (r *ConnectorRepository) GetByStationID(stationId int) ([]*models.Connector
 }
 
 func (r *ConnectorRepository) Update(connector *models.Connector) error {
-	query := "UPDATE connectors SET station_id = ?, state = ? WHERE id = ?"
-	_, err := r.db.Exec(query, connector.StationId, connector.State, connector.Id)
-	return err
-}
-
-func (r *ConnectorRepository) Delete(id int) error {
-	query := "DELETE FROM connectors WHERE id = ?"
-	_, err := r.db.Exec(query, id)
+	query := "UPDATE connectors SET  state = ? WHERE station_id = ? AND ocpp_id = ?"
+	_, err := r.db.Exec(query, connector.State, connector.StationId, connector.Id)
 	return err
 }

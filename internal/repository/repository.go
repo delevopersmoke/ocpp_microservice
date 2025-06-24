@@ -8,10 +8,15 @@ import (
 type Repository struct {
 	Connector
 	Station
+	Session
 }
 
 func NewRepository(db *sql.DB) *Repository {
-	return &Repository{Station: NewStationRepository(db), Connector: NewConnectorRepository(db)}
+	return &Repository{
+		Station:   NewStationRepository(db),
+		Connector: NewConnectorRepository(db),
+		Session:   NewSessionRepository(db),
+	}
 }
 
 type Station interface {
@@ -24,9 +29,17 @@ type Station interface {
 }
 
 type Connector interface {
-	Create(connector *models.Connector) error
-	GetByID(id int) (*models.Connector, error)
+	Get(stationId int, id int) (*models.Connector, error)
 	GetByStationID(stationId int) ([]*models.Connector, error)
 	Update(connector *models.Connector) error
-	Delete(id int) error
+}
+
+type Session interface {
+	GetCurrentSessionByID(id int) (*models.Session, error)
+	GetCurrentSessionByIdTag(idTag string) (*models.Session, error)
+	UpdateCurrentSession(s *models.Session) error
+	DeleteCurrentSession(id int) error
+	CreateFinishedSession(s *models.Session) error
+	GetFinishedSessionByID(id int) (*models.Session, error)
+	UpdateFinishedSession(s *models.Session) error
 }

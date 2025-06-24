@@ -67,7 +67,7 @@ func main() {
 	srv := new(Server)
 	go srv.Run("5010", http.DefaultServeMux)
 
-	control.RegisterCommandServiceServer(grpcServer, controlService)
+	control.RegisterControlServiceServer(grpcServer, controlService)
 
 	lis, err := net.Listen("tcp", ":"+strconv.Itoa(cfg.GRPC.Port))
 	if err != nil {

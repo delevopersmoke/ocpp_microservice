@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: internal/proto/control/control.proto
+// source: proto/control/control.proto
 
 package control
 
@@ -19,141 +19,141 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CommandService_Start_FullMethodName = "/command.CommandService/Start"
-	CommandService_Stop_FullMethodName  = "/command.CommandService/Stop"
+	ControlService_Start_FullMethodName = "/command.ControlService/Start"
+	ControlService_Stop_FullMethodName  = "/command.ControlService/Stop"
 )
 
-// CommandServiceClient is the client API for CommandService service.
+// ControlServiceClient is the client API for ControlService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type CommandServiceClient interface {
+type ControlServiceClient interface {
 	Start(ctx context.Context, in *StartStationRequest, opts ...grpc.CallOption) (*StartStationResponse, error)
 	Stop(ctx context.Context, in *StopStationRequest, opts ...grpc.CallOption) (*StopStationResponse, error)
 }
 
-type commandServiceClient struct {
+type controlServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewCommandServiceClient(cc grpc.ClientConnInterface) CommandServiceClient {
-	return &commandServiceClient{cc}
+func NewControlServiceClient(cc grpc.ClientConnInterface) ControlServiceClient {
+	return &controlServiceClient{cc}
 }
 
-func (c *commandServiceClient) Start(ctx context.Context, in *StartStationRequest, opts ...grpc.CallOption) (*StartStationResponse, error) {
+func (c *controlServiceClient) Start(ctx context.Context, in *StartStationRequest, opts ...grpc.CallOption) (*StartStationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(StartStationResponse)
-	err := c.cc.Invoke(ctx, CommandService_Start_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ControlService_Start_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *commandServiceClient) Stop(ctx context.Context, in *StopStationRequest, opts ...grpc.CallOption) (*StopStationResponse, error) {
+func (c *controlServiceClient) Stop(ctx context.Context, in *StopStationRequest, opts ...grpc.CallOption) (*StopStationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(StopStationResponse)
-	err := c.cc.Invoke(ctx, CommandService_Stop_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ControlService_Stop_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// CommandServiceServer is the server API for CommandService service.
-// All implementations must embed UnimplementedCommandServiceServer
+// ControlServiceServer is the server API for ControlService service.
+// All implementations must embed UnimplementedControlServiceServer
 // for forward compatibility.
-type CommandServiceServer interface {
+type ControlServiceServer interface {
 	Start(context.Context, *StartStationRequest) (*StartStationResponse, error)
 	Stop(context.Context, *StopStationRequest) (*StopStationResponse, error)
-	mustEmbedUnimplementedCommandServiceServer()
+	mustEmbedUnimplementedControlServiceServer()
 }
 
-// UnimplementedCommandServiceServer must be embedded to have
+// UnimplementedControlServiceServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedCommandServiceServer struct{}
+type UnimplementedControlServiceServer struct{}
 
-func (UnimplementedCommandServiceServer) Start(context.Context, *StartStationRequest) (*StartStationResponse, error) {
+func (UnimplementedControlServiceServer) Start(context.Context, *StartStationRequest) (*StartStationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Start not implemented")
 }
-func (UnimplementedCommandServiceServer) Stop(context.Context, *StopStationRequest) (*StopStationResponse, error) {
+func (UnimplementedControlServiceServer) Stop(context.Context, *StopStationRequest) (*StopStationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Stop not implemented")
 }
-func (UnimplementedCommandServiceServer) mustEmbedUnimplementedCommandServiceServer() {}
-func (UnimplementedCommandServiceServer) testEmbeddedByValue()                        {}
+func (UnimplementedControlServiceServer) mustEmbedUnimplementedControlServiceServer() {}
+func (UnimplementedControlServiceServer) testEmbeddedByValue()                        {}
 
-// UnsafeCommandServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to CommandServiceServer will
+// UnsafeControlServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ControlServiceServer will
 // result in compilation errors.
-type UnsafeCommandServiceServer interface {
-	mustEmbedUnimplementedCommandServiceServer()
+type UnsafeControlServiceServer interface {
+	mustEmbedUnimplementedControlServiceServer()
 }
 
-func RegisterCommandServiceServer(s grpc.ServiceRegistrar, srv CommandServiceServer) {
-	// If the following call pancis, it indicates UnimplementedCommandServiceServer was
+func RegisterControlServiceServer(s grpc.ServiceRegistrar, srv ControlServiceServer) {
+	// If the following call pancis, it indicates UnimplementedControlServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&CommandService_ServiceDesc, srv)
+	s.RegisterService(&ControlService_ServiceDesc, srv)
 }
 
-func _CommandService_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ControlService_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StartStationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(CommandServiceServer).Start(ctx, in)
+		return srv.(ControlServiceServer).Start(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: CommandService_Start_FullMethodName,
+		FullMethod: ControlService_Start_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CommandServiceServer).Start(ctx, req.(*StartStationRequest))
+		return srv.(ControlServiceServer).Start(ctx, req.(*StartStationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _CommandService_Stop_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ControlService_Stop_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StopStationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(CommandServiceServer).Stop(ctx, in)
+		return srv.(ControlServiceServer).Stop(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: CommandService_Stop_FullMethodName,
+		FullMethod: ControlService_Stop_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CommandServiceServer).Stop(ctx, req.(*StopStationRequest))
+		return srv.(ControlServiceServer).Stop(ctx, req.(*StopStationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// CommandService_ServiceDesc is the grpc.ServiceDesc for CommandService service.
+// ControlService_ServiceDesc is the grpc.ServiceDesc for ControlService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var CommandService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "command.CommandService",
-	HandlerType: (*CommandServiceServer)(nil),
+var ControlService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "command.ControlService",
+	HandlerType: (*ControlServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "Start",
-			Handler:    _CommandService_Start_Handler,
+			Handler:    _ControlService_Start_Handler,
 		},
 		{
 			MethodName: "Stop",
-			Handler:    _CommandService_Stop_Handler,
+			Handler:    _ControlService_Stop_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "internal/proto/control/control.proto",
+	Metadata: "proto/control/control.proto",
 }

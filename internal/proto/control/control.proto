@@ -2,12 +2,27 @@ syntax = "proto3";
 
 package command;
 
-option go_package = ".;user";
+option go_package = ".;control";
 
-service CommandService {
+service ControlService {
   rpc Start (StartStationRequest) returns (StartStationResponse);
   rpc Stop (StopStationRequest) returns (StopStationResponse);
 }
+
+
+enum ErrorCode {
+  errorUnknown= 0;
+  errorDB = 1;
+  stationNotFound = 2;
+  sendCommandError = 3;
+  commandWasNotAccepted = 4;
+}
+
+message CustomErrorDetail {
+  int64 code = 1;
+  string error = 2;
+}
+
 
 message CommandResponse {
   bool success = 1;
@@ -15,7 +30,9 @@ message CommandResponse {
 }
 
 message StartStationRequest {
-  string station_id = 1;
+  int64 station_id = 1;
+  int64 connector_id = 2;
+  int64 session_id = 3;
 }
 
 message StartStationResponse {
@@ -23,9 +40,12 @@ message StartStationResponse {
 }
 
 message StopStationRequest {
-  string station_id = 1;
+  int64 station_id = 1;
+  int64 session_id = 2;
 }
 
 message StopStationResponse {
   bool success = 1;
 }
+
+
