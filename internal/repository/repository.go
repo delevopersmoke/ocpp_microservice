@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+
 	"github.com/delevopersmoke/ocpp_microservice/internal/models"
 )
 
@@ -26,6 +27,7 @@ type Station interface {
 	Update(station *models.Station) error
 	Delete(id int) error
 	GetByChargeBoxId(chargeBoxId string) (*models.Station, error)
+	SetAllOffline() error
 }
 
 type Connector interface {
@@ -42,4 +44,5 @@ type Session interface {
 	CreateFinishedSession(s *models.Session) error
 	GetFinishedSessionByID(id int) (*models.Session, error)
 	UpdateFinishedSession(s *models.Session) error
+	GetCurrentSessionByConnector(stationId int, connectorOcppId int) (*models.Session, error)
 }

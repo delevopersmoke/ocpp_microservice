@@ -58,6 +58,7 @@ func main() {
 	defer db.Close()
 
 	repo := repository.NewRepository(db)
+	repo.Station.SetAllOffline()
 	grpcServer := grpc.NewServer()
 	controlService := service.NewCommandServiceServer(repo)
 

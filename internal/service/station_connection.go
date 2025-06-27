@@ -5,14 +5,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
+	"math"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/delevopersmoke/ocpp_microservice/internal/models"
 	"github.com/delevopersmoke/ocpp_microservice/internal/proto/control"
 	"github.com/delevopersmoke/ocpp_microservice/internal/repository"
 	"github.com/gorilla/websocket"
-	"log"
-	"strconv"
-	"sync"
-	"time"
 )
 
 // StationService реализует обработку сообщений от станции
@@ -221,12 +224,22 @@ func (s *StationService) handleStatusNotification(uniqueId string, req StatusNot
 	if err != nil {
 		log.Printf("Ошибка получения коннектора с ID %d: %v", req.ConnectorId, err)
 	} else {
-		connector.State = req.Status
-		//connector.ErrorCode = req.ErrorCode
+		connector.State = strings.ToLower(req.Status)
 		if err := s.Repository.Connector.Update(connector); err != nil {
 			log.Printf("Ошибка обновления статуса коннектора %d: %v", req.ConnectorId, err)
 		} else {
 			log.Printf("Статус коннектора %d обновлен на %s", req.ConnectorId, req.Status)
+			session, err := s.Repository.Session.GetCurrentSessionByConnector(s.Station.Id, req.ConnectorId)
+			if err == nil && session != nil && session.WasStopTransaction == 1 {
+				if connector.State != "charging" && connector.State != "finishing" {
+					log.Printf("Автоматически закрываем сессию %d для коннектора %d, состояние: %s", session.Id, req.ConnectorId, connector.State)
+					err = s.Repository.Session.DeleteCurrentSession(session.Id)
+					err2 := s.Repository.Session.CreateFinishedSession(session)
+					if err != nil || err2 != nil {
+						log.Printf("Ошибка при автозакрытии сессии: %v %v", err, err2)
+					}
+				}
+			}
 		}
 	}
 
@@ -317,6 +330,12 @@ func (s *StationService) handleStartTransaction(uniqueId string, req StartTransa
 		session.WasStartTransaction = 1
 		res.TransactionId = session.Id
 		res.IdTagInfo.Status = "Accepted"
+		beginTime, err := time.Parse(time.RFC3339, req.Timestamp)
+		if err == nil {
+			beginTime = beginTime.UTC().Add(time.Hour * 3)
+			session.Begin = beginTime.Format("2006-01-02 15:04:05")
+		}
+
 		_ = s.Repository.UpdateCurrentSession(session)
 	}
 
@@ -345,14 +364,36 @@ func (s *StationService) handleStopTransaction(uniqueId string, req StopTransact
 	if err != nil || session == nil {
 		res.IdTagInfo.Status = "Invalid"
 	} else {
-		session.End = req.Timestamp
-		session.ChargedEnergy = float32(req.MeterStop)
 
-		err = s.Repository.DeleteCurrentSession(session.Id)
-		err = s.Repository.CreateFinishedSession(session)
-		if err != nil {
-			fmt.Println("UpdateCurrentSession:", err)
+		session.ChargedEnergy = float64(req.MeterStop) / 1000
+		connector, _ := s.Repository.Connector.Get(session.StationId, session.ConnectorOcppId)
+		session.WasStopTransaction = 1
+		session.TotalPrice = math.Round(session.ChargedEnergy*session.PricePerKwH*100) / 100
+
+		requestTime, errT1 := time.Parse(time.RFC3339, req.Timestamp)
+		beginTime, errT2 := time.Parse("2006-01-02 15:04:05", session.Begin)
+		if errT1 == nil && errT2 == nil {
+			requestTime = requestTime.UTC().Add(time.Hour * 3)
+			session.TimeLeft = int(requestTime.Sub(beginTime).Seconds())
+			session.End = requestTime.Format("2006-01-02 15:04:05")
 		}
+
+		if connector.State == "finishing" || connector.State == "charging" {
+			err = s.Repository.Session.UpdateCurrentSession(session)
+			if err != nil {
+				fmt.Println("ERROR UpdateCurrentSession:", err.Error())
+			}
+		} else {
+			err = s.Repository.DeleteCurrentSession(session.Id)
+			if err != nil {
+				fmt.Println("ERROR DeleteCurrentSession:", err.Error())
+			}
+			err = s.Repository.CreateFinishedSession(session)
+			if err != nil {
+				fmt.Println("ERROR CreateFinishedSession:", err.Error())
+			}
+		}
+
 		res.IdTagInfo.Status = "Invalid"
 	}
 
@@ -393,19 +434,19 @@ func (s *StationService) handleMeterValues(uniqueId string, req MeterValuesReque
 			for _, sv := range mv.SampledValue {
 				if sv.Measurand == "Voltage" {
 					if v, err := strconv.ParseFloat(sv.Value, 32); err == nil {
-						session.Voltage = float32(v)
+						session.Voltage = v
 					}
 				} else if sv.Measurand == "Current.Import" {
 					if v, err := strconv.ParseFloat(sv.Value, 32); err == nil {
-						session.Current = float32(v)
+						session.Current = v
 					}
 				} else if sv.Measurand == "Power.Active.Import" {
 					if v, err := strconv.ParseFloat(sv.Value, 32); err == nil {
-						session.Power = float32(v)
+						session.Power = v
 					}
 				} else if sv.Measurand == "Energy.Active.Import.Register" {
 					if v, err := strconv.ParseFloat(sv.Value, 32); err == nil {
-						session.ChargedEnergy = float32(v)
+						session.ChargedEnergy = v
 					}
 				} else if sv.Measurand == "SoC" {
 					session.SOC, _ = strconv.Atoi(sv.Value)
@@ -420,6 +461,14 @@ func (s *StationService) handleMeterValues(uniqueId string, req MeterValuesReque
 			session.MaxPower = session.Power
 		}
 
+		requestTime, errT1 := time.Parse(time.RFC3339, req.MeterValue[0].Timestamp)
+		beginTime, errT2 := time.Parse("2006-01-02 15:04:05", session.Begin)
+		if errT1 == nil && errT2 == nil {
+			session.TimeLeft = int(requestTime.Add(time.Hour * 3).Sub(beginTime).Seconds())
+		}
+
+		//session.End = time.Now().UTC().Add(time.Hour * 3).Format(time.RFC3339)
+		session.TotalPrice = math.Round(session.ChargedEnergy*session.PricePerKwH*100) / 100
 		session.WasFirstMeterValues = 1
 		err = s.Repository.Session.UpdateCurrentSession(session)
 		if err != nil {
@@ -583,7 +632,7 @@ func (s *StationService) sendRemoteStartTransaction(sessionId int) int {
 	}
 
 	req := RemoteStartTransactionRequest{
-		ConnectorId: session.ConnectorId,
+		ConnectorId: session.ConnectorOcppId,
 		IdTag:       session.IdTag,
 	}
 
@@ -604,6 +653,11 @@ func (s *StationService) sendRemoteStartTransaction(sessionId int) int {
 		return int(control.ErrorCode_commandWasNotAccepted)
 	}
 	session.WasStartAccepted = 1
+
+	//beginTime, err := time.Parse(time.RFC3339, res.Status)
+	//beginTime = beginTime.UTC().Add(time.Hour * 3)
+
+	//session.Begin = beginTime.Format("2006-01-02 15:04:05")
 	err = s.Repository.Session.UpdateCurrentSession(session)
 	if err != nil {
 		fmt.Println("UpdateCurrentSession:", err)

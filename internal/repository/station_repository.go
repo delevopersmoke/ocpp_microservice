@@ -81,3 +81,9 @@ func (r *StationRepository) GetByChargeBoxId(chargeBoxId string) (*models.Statio
 	}
 	return &s, nil
 }
+
+func (r *StationRepository) SetAllOffline() error {
+	query := `UPDATE stations SET state = 'offline'`
+	_, err := r.db.Exec(query)
+	return err
+}

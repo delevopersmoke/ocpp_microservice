@@ -2,11 +2,12 @@ package handler
 
 import (
 	"fmt"
+	"log"
+	"net/http"
+
 	"github.com/delevopersmoke/ocpp_microservice/internal/repository"
 	"github.com/delevopersmoke/ocpp_microservice/internal/service"
 	"github.com/gorilla/websocket"
-	"log"
-	"net/http"
 )
 
 type Handler struct {

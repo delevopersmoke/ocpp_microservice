@@ -13,22 +13,25 @@ type Session struct {
 	ConnectorPower      int
 	Begin               string
 	End                 string
-	Voltage             float32
-	Current             float32
-	Power               float32
+	Voltage             float64
+	Current             float64
+	Power               float64
 	SOC                 int
 	SOCBegin            int
 	SOCEnd              int
-	MaxPower            float32
-	ChargedEnergy       float32
-	PriceLimit          float32
-	PricePerKwH         float32
+	MaxPower            float64
+	ChargedEnergy       float64
+	PriceLimit          float64
+	PricePerKwH         float64
 	PercentLimit        int
 	WasStartAccepted    int
 	WasFirstMeterValues int
 	WasStartTransaction int
+	WasStopTransaction  int
 	LocationCountry     string
 	LocationCity        string
 	LocationStreet      string
 	StationSerial       string
+	TotalPrice          float64
+	TimeLeft            int
 }
