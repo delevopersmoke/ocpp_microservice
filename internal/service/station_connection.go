@@ -640,24 +640,23 @@ func (s *StationService) sendRemoteStartTransaction(sessionId int) int {
 	err = s.sendRequest("RemoteStartTransaction", req, res)
 
 	if err != nil {
-		fmt.Println("sendRemoteStartTransaction:", err)
+		session.Begin = time.Now().UTC().Add(time.Hour * 3).Format("2006-01-02 15:04:05")
+		session.End = session.Begin
+		err = s.Repository.Session.DeleteCurrentSession(session.Id)
+		err = s.Repository.Session.CreateFinishedSession(session)
 		return int(control.ErrorCode_sendCommandError)
 	}
 
 	if res.Status != "Accepted" {
-		session.WasStartAccepted = -1
-		err = s.Repository.Session.UpdateCurrentSession(session)
-		if err != nil {
-			fmt.Println("UpdateCurrentSession:", err)
-		}
+		session.WasStartAccepted = 2
+		session.Begin = time.Now().UTC().Add(time.Hour * 3).Format("2006-01-02 15:04:05")
+		session.End = session.Begin
+		err = s.Repository.Session.DeleteCurrentSession(session.Id)
+		err = s.Repository.Session.CreateFinishedSession(session)
 		return int(control.ErrorCode_commandWasNotAccepted)
 	}
+
 	session.WasStartAccepted = 1
-
-	//beginTime, err := time.Parse(time.RFC3339, res.Status)
-	//beginTime = beginTime.UTC().Add(time.Hour * 3)
-
-	//session.Begin = beginTime.Format("2006-01-02 15:04:05")
 	err = s.Repository.Session.UpdateCurrentSession(session)
 	if err != nil {
 		fmt.Println("UpdateCurrentSession:", err)

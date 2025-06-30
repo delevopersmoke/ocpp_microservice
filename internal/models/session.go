@@ -34,4 +34,6 @@ type Session struct {
 	StationSerial       string
 	TotalPrice          float64
 	TimeLeft            int
+	LocationPhotoUrl    string
+	Owner               string
 }

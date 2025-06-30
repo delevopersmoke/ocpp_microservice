@@ -33,7 +33,7 @@ func (s *CommandServiceServer) Start(ctx context.Context, req *control.StartStat
 		}
 	} else {
 		fmt.Println("Station not found:", req.StationId)
-		return nil, getCustomError(int64(control.ErrorCode_stationNotFound), fmt.Errorf("password must be at least 6 characters"))
+		return nil, getCustomError(int64(control.ErrorCode_stationNotConnected), fmt.Errorf("password must be at least 6 characters"))
 	}
 }
 
@@ -48,7 +48,7 @@ func (s *CommandServiceServer) Stop(ctx context.Context, req *control.StopStatio
 		}
 	} else {
 		fmt.Println("Station not found:", req.StationId)
-		return nil, getCustomError(int64(control.ErrorCode_stationNotFound), fmt.Errorf("Station not found: "))
+		return nil, getCustomError(int64(control.ErrorCode_stationNotConnected), fmt.Errorf("Station not found: "))
 	}
 }
 

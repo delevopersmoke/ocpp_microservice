@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: proto/control/control.proto
+// source: internal/proto/control/control.proto
 
 package control
 
@@ -155,5 +155,5 @@ var ControlService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/control/control.proto",
+	Metadata: "internal/proto/control/control.proto",
 }

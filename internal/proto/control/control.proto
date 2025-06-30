@@ -13,9 +13,9 @@ service ControlService {
 enum ErrorCode {
   errorUnknown= 0;
   errorDB = 1;
-  stationNotFound = 2;
-  sendCommandError = 3;
-  commandWasNotAccepted = 4;
+  stationNotConnected = 902;
+  sendCommandError = 903;
+  commandWasNotAccepted = 904;
 }
 
 message CustomErrorDetail {
